@@ -168,14 +168,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Prefab: {fileID: 6831108980965835434, guid: ed900759376f34279a6000231f29c535, type: 3}
-  Size: 150
+  Size: 200
   WaveAmplitude: 2.5
   WaveFrequency: 10
   WaveDamping: 1.5
   WaveSpeed: 15
-  CubePositionMultiplier: 1.1
+  CubePositionMultiplier: 1
   LifetimeOffset: 0.2
-  TopColor: {r: 0.1764706, g: 0.7490196, b: 1, a: 0}
+  TopColor: {r: 0.17647058, g: 1, b: 0.8846167, a: 0}
   BottomColor: {r: 0.119259514, g: 0.2814932, b: 0.3773585, a: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

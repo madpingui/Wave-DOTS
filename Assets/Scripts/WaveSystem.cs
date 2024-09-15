@@ -7,21 +7,21 @@ using Unity.Transforms;
 
 public partial struct WaveSystem : ISystem
 {
-    private NativeList<WaveData> activeWaves; // Native list for active waves
+    private NativeList<WaveData> activeWaves; // List storing data for active waves
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
-        // Initialize the NativeList to store wave data
+        // Initialize the list to store waves and ensure necessary components are available
         activeWaves = new NativeList<WaveData>(Allocator.Persistent);
-        state.RequireForUpdate<Config>();
-        state.RequireForUpdate<Hit>();
+        state.RequireForUpdate<Config>(); // Require configuration component
+        state.RequireForUpdate<Hit>(); // Require hit detection component
     }
 
     [BurstCompile]
     public void OnDestroy(ref SystemState state)
     {
-        // Dispose of the NativeList when the system is destroyed
+        // Dispose of the list when the system is destroyed to free memory
         if (activeWaves.IsCreated)
         {
             activeWaves.Dispose();
@@ -31,11 +31,11 @@ public partial struct WaveSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        var config = SystemAPI.GetSingleton<Config>();
-        var hit = SystemAPI.GetSingleton<Hit>();
-        float currentTime = (float)SystemAPI.Time.ElapsedTime;
+        var config = SystemAPI.GetSingleton<Config>(); // Get configuration data
+        var hit = SystemAPI.GetSingleton<Hit>(); // Get hit data
+        float currentTime = (float)SystemAPI.Time.ElapsedTime; // Get the current time
 
-        // If a new wave is initiated, add it to the native list
+        // If a new hit is detected, add a new wave to the active wave list
         if (hit.HitChanged)
         {
             activeWaves.Add(new WaveData
@@ -45,17 +45,17 @@ public partial struct WaveSystem : ISystem
             });
         }
 
-        // Remove old waves beyond their lifetime
+        // Remove waves that have surpassed their lifetime
         float waveLifetime = config.WaveLifetime;
         for (int i = activeWaves.Length - 1; i >= 0; i--)
         {
             if (currentTime - activeWaves[i].HitTime > waveLifetime)
             {
-                activeWaves.RemoveAtSwapBack(i);
+                activeWaves.RemoveAtSwapBack(i); // Efficient removal from the list
             }
         }
 
-        // Schedule the wave animation job
+        // Schedule a job to animate the waves and update the system's dependency
         var jobHandle = new WaveAnimationJob
         {
             Time = currentTime,
@@ -68,68 +68,65 @@ public partial struct WaveSystem : ISystem
             BottomColor = config.BottomColor
         }.ScheduleParallel(state.Dependency);
 
-        // Update the system's dependency
-        state.Dependency = jobHandle;
+        state.Dependency = jobHandle; // Update the system's job dependency
     }
 }
 
-// Struct to store wave data
+// Data structure to store information about each wave
 struct WaveData
 {
-    public float HitTime;
-    public float3 HitPosition;
+    public float HitTime; // The time the wave was created
+    public float3 HitPosition; // The position of the hit that initiated the wave
 }
 
 [BurstCompile]
 partial struct WaveAnimationJob : IJobEntity
 {
-    [ReadOnly] public float Time;
-    [ReadOnly] public NativeArray<WaveData> Waves;
-    [ReadOnly] public float WaveAmplitude;
-    [ReadOnly] public float WaveFrequency;
-    [ReadOnly] public float WaveDamping;
-    [ReadOnly] public float WaveSpeed;
-    [ReadOnly] public float3 TopColor;
-    [ReadOnly] public float3 BottomColor;
+    [ReadOnly] public float Time; // The current time
+    [ReadOnly] public NativeArray<WaveData> Waves; // Array of active waves
+    [ReadOnly] public float WaveAmplitude; // Amplitude of the waves
+    [ReadOnly] public float WaveFrequency; // Frequency of the waves
+    [ReadOnly] public float WaveDamping; // Damping factor reducing wave strength over time
+    [ReadOnly] public float WaveSpeed; // Speed at which the waves propagate
+    [ReadOnly] public float3 TopColor; // Color at the top of the wave
+    [ReadOnly] public float3 BottomColor; // Color at the bottom of the wave
 
     void Execute(ref LocalTransform transform, ref URPMaterialPropertyBaseColor baseColor, in WaveObjectTag waveObjectTag)
     {
-        float totalWaveHeight = 0f;
+        float totalWaveHeight = 0f; // Accumulated wave height from all waves
 
-        // Iterate over all waves and combine their effects
+        // Loop through all waves to combine their effects
         for (int i = 0; i < Waves.Length; i++)
         {
             var wave = Waves[i];
-            float2 horizontalDistance = transform.Position.xz - wave.HitPosition.xz;
+            float2 horizontalDistance = transform.Position.xz - wave.HitPosition.xz; // Distance from the wave origin to the object
             float distance = math.length(horizontalDistance);
             float timeSinceHit = Time - wave.HitTime;
 
-            // Delay the wave based on distance from the hit position
+            // Calculate the time required for the wave to reach the object
             float timeToReachCube = distance / WaveSpeed;
             float adjustedTime = timeSinceHit - timeToReachCube;
 
-            // Only apply the wave if it has reached the cube
+            // If the wave has reached the object, calculate its effect
             if (adjustedTime > 0)
             {
                 float phase = WaveFrequency * adjustedTime;
-                float damping = math.exp(-WaveDamping * adjustedTime);
+                float damping = math.exp(-WaveDamping * adjustedTime); // Apply damping over time
                 float waveHeight = WaveAmplitude * damping * math.sin(phase);
 
-                // Accumulate the wave heights to combine the effects
+                // Accumulate the total wave height
                 totalWaveHeight += waveHeight;
             }
         }
 
-        // Update only the y position, combining the effects of all waves
+        // Update the object's y position based on the combined wave effects
         transform.Position.y = math.abs(totalWaveHeight) < 0.001f ? 0 : totalWaveHeight;
 
-        // Normalize the Y value so that y=0 is the midpoint between TopColor and BottomColor
+        // Calculate the interpolated color based on the wave height
         float normalizedHeight = math.clamp((transform.Position.y / WaveAmplitude) * 0.5f + 0.5f, 0f, 1f);
-
-        // Lerp between BottomColor and TopColor based on normalized height
         float3 interpolatedColor = math.lerp(BottomColor, TopColor, normalizedHeight);
 
-        // Set the cube's color based on the interpolated color
-        baseColor.Value = new float4(interpolatedColor, 1f); // RGBA
+        // Set the color of the object
+        baseColor.Value = new float4(interpolatedColor, 1f); // Set the RGBA color
     }
 }
