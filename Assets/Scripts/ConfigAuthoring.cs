@@ -13,6 +13,9 @@ public class ConfigAuthoring : MonoBehaviour
     public float CubePositionMultiplier; // Gap between cubes
     public float LifetimeOffset = 0.1f; // adds % more time
 
+    public Color TopColor;
+    public Color BottomColor;
+
     class Baker : Baker<ConfigAuthoring>
     {
         public override void Bake(ConfigAuthoring authoring)
@@ -37,7 +40,9 @@ public class ConfigAuthoring : MonoBehaviour
                 WaveDamping = authoring.WaveDamping,
                 WaveSpeed = authoring.WaveSpeed,
                 WaveLifetime = calculatedLifetime,
-                CubePositionMultiplier = authoring.CubePositionMultiplier
+                CubePositionMultiplier = authoring.CubePositionMultiplier,
+                TopColor = new float3(authoring.TopColor.r, authoring.TopColor.g, authoring.TopColor.b),
+                BottomColor = new float3(authoring.BottomColor.r, authoring.BottomColor.g, authoring.BottomColor.b)
             });
             AddComponent<Hit>(entity);
         }
@@ -54,6 +59,9 @@ public struct Config : IComponentData
     public float WaveSpeed;
     public float WaveLifetime;
     public float CubePositionMultiplier;
+
+    public float3 TopColor;
+    public float3 BottomColor;
 }
 
 public struct Hit : IComponentData

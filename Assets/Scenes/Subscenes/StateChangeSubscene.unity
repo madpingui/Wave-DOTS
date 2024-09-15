@@ -175,6 +175,8 @@ MonoBehaviour:
   WaveSpeed: 15
   CubePositionMultiplier: 1.1
   LifetimeOffset: 0.2
+  TopColor: {r: 0.1764706, g: 0.7490196, b: 1, a: 0}
+  BottomColor: {r: 0.119259514, g: 0.2814932, b: 0.3773585, a: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

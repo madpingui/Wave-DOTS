@@ -2,6 +2,7 @@ using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
+using Unity.Rendering;
 using Unity.Transforms;
 
 public partial struct WaveSystem : ISystem
@@ -62,7 +63,9 @@ public partial struct WaveSystem : ISystem
             WaveAmplitude = config.WaveAmplitude,
             WaveFrequency = config.WaveFrequency,
             WaveDamping = config.WaveDamping,
-            WaveSpeed = config.WaveSpeed
+            WaveSpeed = config.WaveSpeed,
+            TopColor = config.TopColor,
+            BottomColor = config.BottomColor
         }.ScheduleParallel(state.Dependency);
 
         // Update the system's dependency
@@ -86,8 +89,10 @@ partial struct WaveAnimationJob : IJobEntity
     [ReadOnly] public float WaveFrequency;
     [ReadOnly] public float WaveDamping;
     [ReadOnly] public float WaveSpeed;
+    [ReadOnly] public float3 TopColor;
+    [ReadOnly] public float3 BottomColor;
 
-    void Execute(ref LocalTransform transform, in WaveObjectTag waveObjectTag)
+    void Execute(ref LocalTransform transform, ref URPMaterialPropertyBaseColor baseColor, in WaveObjectTag waveObjectTag)
     {
         float totalWaveHeight = 0f;
 
@@ -95,18 +100,13 @@ partial struct WaveAnimationJob : IJobEntity
         for (int i = 0; i < Waves.Length; i++)
         {
             var wave = Waves[i];
-            float timeSinceHit = Time - wave.HitTime;
             float2 horizontalDistance = transform.Position.xz - wave.HitPosition.xz;
             float distance = math.length(horizontalDistance);
-
-            // Skip if entity is beyond the wave's reach
-            if (distance > WaveSpeed * timeSinceHit)
-            {
-                continue;
-            }
+            float timeSinceHit = Time - wave.HitTime;
 
             // Delay the wave based on distance from the hit position
-            float adjustedTime = timeSinceHit - (distance / WaveSpeed);
+            float timeToReachCube = distance / WaveSpeed;
+            float adjustedTime = timeSinceHit - timeToReachCube;
 
             // Only apply the wave if it has reached the cube
             if (adjustedTime > 0)
@@ -121,7 +121,15 @@ partial struct WaveAnimationJob : IJobEntity
         }
 
         // Update only the y position, combining the effects of all waves
-        // Reset to the original position if the combined effect is small
         transform.Position.y = math.abs(totalWaveHeight) < 0.001f ? 0 : totalWaveHeight;
+
+        // Normalize the Y value so that y=0 is the midpoint between TopColor and BottomColor
+        float normalizedHeight = math.clamp((transform.Position.y / WaveAmplitude) * 0.5f + 0.5f, 0f, 1f);
+
+        // Lerp between BottomColor and TopColor based on normalized height
+        float3 interpolatedColor = math.lerp(BottomColor, TopColor, normalizedHeight);
+
+        // Set the cube's color based on the interpolated color
+        baseColor.Value = new float4(interpolatedColor, 1f); // RGBA
     }
 }
